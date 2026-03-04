@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Meta Ads Launcher</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #07090f; --surface: #0d1117; --surface2: #111827;
+      --border: #1e2a3a; --border2: #263548; --text: #e8edf5;
+      --muted: #5a7494; --accent: #f97316; --green: #22c55e; --red: #ef4444;
+    }
+    body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; min-height: 100vh; padding: 40px 20px; }
+    body::before { content: ''; position: fixed; top: -200px; left: 50%; transform: translateX(-50%); width: 600px; height: 600px; background: radial-gradient(circle, #f9731608 0%, transparent 70%); pointer-events: none; }
+    .container { max-width: 660px; margin: 0 auto; }
+    .header { margin-bottom: 40px; }
+    .header-top { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
+    .logo { width: 42px; height: 42px; background: linear-gradient(135deg, #f97316, #7c3aed); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+    h1 { font-family: 'Syne', sans-serif; font-size: 24px; font-weight: 800; background: linear-gradient(90deg, #f97316, #fb923c); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .subtitle { color: var(--muted); font-size: 14px; }
+    .steps { display: flex; align-items: center; margin-bottom: 32px; }
+    .step-item { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+    .step-dot { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 700; transition: all 0.3s; }
+    .step-dot.done { background: #22c55e20; color: var(--green); border: 2px solid var(--green); }
+    .step-dot.active { background: #f9731620; color: var(--accent); border: 2px solid var(--accent); box-shadow: 0 0 20px #f9731630; }
+    .step-dot.pending { background: var(--surface2); color: var(--muted); border: 2px solid var(--border); }
+    .step-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; white-space: nowrap; }
+    .step-label.done { color: var(--green); } .step-label.active { color: var(--accent); } .step-label.pending { color: var(--muted); }
+    .step-line { flex: 1; height: 2px; margin: 0 8px; margin-bottom: 20px; transition: background 0.3s; }
+    .step-line.done { background: var(--green); } .step-line.pending { background: var(--border); }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 28px; }
+    .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+    .card-title { font-family: 'Syne', sans-serif; font-size: 17px; font-weight: 700; }
+    .back-btn { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 13px; font-family: 'DM Sans', sans-serif; padding: 4px 8px; border-radius: 6px; transition: color 0.2s; }
+    .back-btn:hover { color: var(--text); }
+    .field { margin-bottom: 18px; }
+    label { display: block; font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 7px; }
+    input, select { width: 100%; padding: 11px 14px; background: #070c14; border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 14px; font-family: 'DM Sans', sans-serif; outline: none; transition: border-color 0.2s; }
+    input:focus, select:focus { border-color: var(--accent); }
+    input::placeholder { color: var(--muted); }
+    .hint { font-size: 12px; color: var(--muted); margin-top: 5px; }
+    .btn { padding: 11px 22px; border-radius: 9px; border: none; font-size: 14px; font-weight: 700; font-family: 'DM Sans', sans-serif; cursor: pointer; transition: all 0.2s; }
+    .btn-primary { background: linear-gradient(135deg, #f97316, #ea580c); color: #fff; }
+    .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+    .btn-primary:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; transform: none; }
+    .btn-secondary { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
+    .btn-secondary:hover { color: var(--text); }
+    .btn-success { background: linear-gradient(135deg, #22c55e, #16a34a); color: #fff; }
+    .btn-success:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; }
+    .alert { border-radius: 8px; padding: 11px 14px; font-size: 13px; margin-bottom: 16px; }
+    .alert-error { background: #1e0a0a; border: 1px solid #ef444440; color: #f87171; }
+    .alert-success { background: #0a1e0a; border: 1px solid #22c55e40; color: #4ade80; }
+    .alert-info { background: #0a1220; border: 1px solid #3b82f640; color: #93c5fd; }
+    .copy-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 16px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }
+    .copy-table th { background: #070c14; padding: 8px 12px; text-align: left; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; }
+    .copy-table td { padding: 8px 12px; border-top: 1px solid var(--border); }
+    .copy-table tr:nth-child(even) td { background: var(--surface2); }
+    .td-truncate { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .td-num { color: var(--muted); font-size: 12px; font-family: 'DM Mono', monospace; }
+    .dropzone { border: 2px dashed var(--border2); border-radius: 10px; padding: 32px 20px; text-align: center; cursor: pointer; transition: border-color 0.2s, background 0.2s; margin-bottom: 20px; }
+    .dropzone:hover, .dropzone.dragover { border-color: var(--accent); background: #f9731608; }
+    .dropzone-icon { font-size: 36px; margin-bottom: 10px; }
+    .dropzone-text { color: var(--muted); font-size: 14px; }
+    .dropzone-text span { color: var(--accent); font-weight: 700; }
+    .dropzone-sub { color: var(--muted); font-size: 12px; margin-top: 4px; }
+    .creative-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
+    .creative-card { background: #070c14; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; position: relative; }
+    .creative-thumb { height: 90px; background: var(--surface2); display: flex; align-items: center; justify-content: center; font-size: 28px; }
+    .creative-thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .creative-info { padding: 8px 10px; }
+    .creative-name { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .creative-size { font-size: 10px; color: #3a5070; margin-top: 2px; }
+    .creative-remove { position: absolute; top: 6px; right: 6px; background: var(--red); border: none; color: #fff; width: 22px; height: 22px; border-radius: 50%; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; }
+    .summary { background: #070c14; border-radius: 8px; padding: 14px 16px; margin-bottom: 20px; }
+    .summary-row { display: flex; gap: 12px; margin-bottom: 6px; font-size: 13px; }
+    .summary-row:last-child { margin-bottom: 0; }
+    .summary-key { color: var(--muted); width: 160px; flex-shrink: 0; }
+    .summary-val { color: var(--text); font-weight: 600; }
+    .summary-val.accent { color: var(--accent); }
+    .result-item { display: flex; align-items: center; gap: 12px; background: #070c14; border-radius: 8px; padding: 12px 14px; margin-bottom: 8px; }
+    .result-icon { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; flex-shrink: 0; }
+    .result-icon.success { background: #22c55e20; color: var(--green); }
+    .result-icon.error { background: #ef444420; color: var(--red); }
+    .result-icon.uploading { background: #f9731620; color: var(--accent); }
+    .result-name { font-size: 13px; font-weight: 600; }
+    .result-id { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; margin-top: 2px; }
+    .result-error { font-size: 11px; color: var(--red); margin-top: 2px; }
+    .result-status { font-size: 11px; font-weight: 700; text-transform: uppercase; margin-left: auto; }
+    .result-status.success { color: var(--green); } .result-status.error { color: var(--red); } .result-status.uploading { color: var(--accent); }
+    .done-screen { text-align: center; padding: 20px 0; }
+    .done-emoji { font-size: 52px; margin-bottom: 12px; }
+    .done-title { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 800; margin-bottom: 6px; }
+    .done-sub { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+    .badge { display: inline-flex; align-items: center; gap: 6px; background: #22c55e20; color: var(--green); border: 1px solid #22c55e40; border-radius: 20px; padding: 4px 12px; font-size: 12px; font-weight: 700; margin-bottom: 16px; }
+    select option { background: #0d1117; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div class="header-top">
+      <div class="logo">⚡</div>
+      <h1>Meta Ads Launcher</h1>
+    </div>
+    <p class="subtitle">Upload creatives, laad copy uit Google Sheets en lanceer ads in één klik.</p>
+  </div>
+  <div class="steps" id="stepIndicator"></div>
+  <div id="appRoot"></div>
+</div>
+
+<script>
+const state = {
+  step: 0,
+  accessToken: '', adAccountId: '',
+  campaigns: [], adSets: [],
+  selectedCampaign: '', selectedAdSet: '',
+  sheetUrl: '', copyRows: [],
+  destinationUrl: '', pageId: '',
+  creatives: [],
+  results: [], launching: false, launchDone: false,
+  error: '', loading: false,
+};
+
+const API = 'https://graph.facebook.com/v19.0';
+const STEPS = ['Verbinding','Copy','Creatives','Lanceren'];
+const ICONS = ['🔑','📝','🖼️','🚀'];
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function renderSteps() {
+  const cur = Math.min(state.step, 3);
+  document.getElementById('stepIndicator').innerHTML = STEPS.map((s,i) => {
+    const cls = i < cur ? 'done' : i === cur ? 'active' : 'pending';
+    const icon = i < cur ? '✓' : ICONS[i];
+    const line = i < STEPS.length-1 ? `<div class="step-line ${i<cur?'done':'pending'}"></div>` : '';
+    return `<div class="step-item"><div class="step-dot ${cls}">${icon}</div><span class="step-label ${cls}">${s}</span></div>${line}`;
+  }).join('');
+}
+
+function mkField(label, id, type, val, ph, hint) {
+  return `<div class="field"><label for="${id}">${label}</label><input type="${type}" id="${id}" value="${esc(val)}" placeholder="${esc(ph)}">${hint ? `<p class="hint">${hint}</p>` : ''}</div>`;
+}
+
+function mkAlert(type, msg) {
+  return msg ? `<div class="alert alert-${type}">${esc(msg)}</div>` : '';
+}
+
+// ── Step 0 ──────────────────────────────────────────────────────────────────
+function renderStep0() {
+  const extra = state.campaigns.length ? `
+    <div style="margin-top:20px">
+      <div class="field">
+        <label>Campagne</label>
+        <select id="selCampaign">
+          <option value="">— Selecteer campagne —</option>
+          ${state.campaigns.map(c=>`<option value="${c.id}" ${state.selectedCampaign===c.id?'selected':''}>${esc(c.name)} (${c.status})</option>`).join('')}
+        </select>
+      </div>
+      ${state.adSets.length ? `
+      <div class="field">
+        <label>Ad Set</label>
+        <select id="selAdSet">
+          <option value="">— Selecteer ad set —</option>
+          ${state.adSets.map(a=>`<option value="${a.id}" ${state.selectedAdSet===a.id?'selected':''}>${esc(a.name)} (${a.status})</option>`).join('')}
+        </select>
+      </div>` : ''}
+      ${state.selectedAdSet ? `<button class="btn btn-primary" id="btnToStep1">Verder naar Copy →</button>` : ''}
+    </div>` : '';
+
+  document.getElementById('appRoot').innerHTML = `
+    <div class="card">
+      <div class="card-header"><span class="card-title">🔑 Meta verbinding</span></div>
+      ${mkField('Access Token','inToken','password',state.accessToken,'EAAxxxxxxxxxxxxxxx','Haal op via developers.facebook.com/tools/explorer')}
+      ${mkField('Ad Account ID','inAccount','text',state.adAccountId,'act_123456789 of 123456789','')}
+      ${mkAlert('error', state.error)}
+      <button class="btn btn-primary" id="btnConnect" ${!state.accessToken||!state.adAccountId||state.loading?'disabled':''}>
+        ${state.loading?'⏳ Verbinden...':'Verbinden met Meta →'}
+      </button>
+      ${extra}
+    </div>`;
+
+  bind('inToken', 'input', e => { state.accessToken = e.target.value; renderStep0(); });
+  bind('inAccount', 'input', e => { state.adAccountId = e.target.value; renderStep0(); });
+  bind('btnConnect', 'click', handleConnect);
+  bind('selCampaign', 'change', e => handleSelectCampaign(e.target.value));
+  bind('selAdSet', 'change', e => { state.selectedAdSet = e.target.value; renderStep0(); });
+  bind('btnToStep1', 'click', () => go(1));
+}
+
+// ── Step 1 ──────────────────────────────────────────────────────────────────
+function renderStep1() {
+  const table = state.copyRows.length ? `
+    <div class="badge">✓ ${state.copyRows.length} copy-varianten geladen</div>
+    <table class="copy-table">
+      <thead><tr><th>#</th><th>Headline</th><th>Bodytekst</th><th>Beschrijving</th></tr></thead>
+      <tbody>${state.copyRows.map((r,i)=>`
+        <tr>
+          <td class="td-num">${i+1}</td>
+          <td>${esc(r.headline||'—')}</td>
+          <td class="td-truncate">${esc(r.body||'—')}</td>
+          <td>${esc(r.description||'—')}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+    <div style="margin-top:20px">
+      ${mkField('Bestemmings-URL','inUrl','url',state.destinationUrl,'https://follow-this.org/green-paper','')}
+      ${mkField('Facebook Page ID','inPageId','text',state.pageId,'123456789','Vind je via je Facebook pagina → Over → Pagina ID')}
+    </div>
+    ${state.destinationUrl && state.pageId ? `<button class="btn btn-primary" id="btnToStep2">Verder naar Creatives →</button>` : ''}
+  ` : '';
+
+  document.getElementById('appRoot').innerHTML = `
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">📝 Google Sheets copy</span>
+        <button class="back-btn" id="btnBack1">← Terug</button>
+      </div>
+      ${mkField('Google Sheets URL','inSheet','url',state.sheetUrl,'https://docs.google.com/spreadsheets/d/...','Sheet moet openbaar zijn: Delen → Iedereen met de link → Bekijker')}
+      ${mkAlert('error', state.error)}
+      <button class="btn btn-primary" id="btnLoadSheet" style="margin-bottom:20px" ${!state.sheetUrl||state.loading?'disabled':''}>
+        ${state.loading?'⏳ Laden...':'Sheet inladen'}
+      </button>
+      ${table}
+    </div>`;
+
+  bind('inSheet', 'input', e => { state.sheetUrl = e.target.value; });
+  bind('btnLoadSheet', 'click', handleLoadSheet);
+  bind('inUrl', 'input', e => { state.destinationUrl = e.target.value; renderStep1(); });
+  bind('inPageId', 'input', e => { state.pageId = e.target.value; renderStep1(); });
+  bind('btnToStep2', 'click', () => go(2));
+  bind('btnBack1', 'click', () => go(0));
+}
+
+// ── Step 2 ──────────────────────────────────────────────────────────────────
+function renderStep2() {
+  const cards = state.creatives.map((f,i) => `
+    <div class="creative-card">
+      <div class="creative-thumb" id="thumb_${i}">${f.type.startsWith('video/')?'🎬':'🖼️'}</div>
+      <div class="creative-info">
+        <div class="creative-name">${esc(f.name)}</div>
+        <div class="creative-size">${(f.size/1024/1024).toFixed(1)} MB</div>
+      </div>
+      <button class="creative-remove" data-idx="${i}">×</button>
+    </div>`).join('');
+
+  document.getElementById('appRoot').innerHTML = `
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">🖼️ Creatives (${state.creatives.length}/6)</span>
+        <button class="back-btn" id="btnBack2">← Terug</button>
+      </div>
+      ${state.creatives.length < 6 ? `
+      <div class="dropzone" id="dropzone">
+        <div class="dropzone-icon">📁</div>
+        <p class="dropzone-text">Sleep bestanden hierheen of <span>klik om te kiezen</span></p>
+        <p class="dropzone-sub">JPG, PNG, MP4 · Max 6 bestanden · Afbeeldingen tot 30MB, video's tot 4GB</p>
+        <input type="file" id="fileInput" multiple accept="image/*,video/*" style="display:none">
+      </div>` : ''}
+      ${state.creatives.length > 0 ? `
+        <div class="creative-grid">${cards}</div>
+        <div class="summary">
+          <div class="summary-row"><span class="summary-key">Creatives</span><span class="summary-val">${state.creatives.length} bestanden</span></div>
+          <div class="summary-row"><span class="summary-key">Copy varianten</span><span class="summary-val">${state.copyRows.length} sets</span></div>
+          <div class="summary-row"><span class="summary-key">Ads te maken</span><span class="summary-val accent">${state.creatives.length} ads (elk met alle copy-varianten)</span></div>
+        </div>
+        <button class="btn btn-primary" id="btnToStep3">Verder naar Lanceren →</button>
+      ` : ''}
+    </div>`;
+
+  bind('btnBack2', 'click', () => go(1));
+  bind('btnToStep3', 'click', () => go(3));
+
+  const dz = document.getElementById('dropzone');
+  const fi = document.getElementById('fileInput');
+  if (dz) {
+    dz.addEventListener('click', () => fi.click());
+    dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragover'); });
+    dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
+    dz.addEventListener('drop', e => {
+      e.preventDefault(); dz.classList.remove('dragover');
+      addFiles(Array.from(e.dataTransfer.files));
+    });
+  }
+  if (fi) fi.addEventListener('change', e => addFiles(Array.from(e.target.files)));
+
+  document.querySelectorAll('.creative-remove').forEach(btn => {
+    btn.addEventListener('click', e => {
+      state.creatives.splice(parseInt(e.currentTarget.dataset.idx), 1);
+      renderStep2();
+    });
+  });
+
+  // Load image previews
+  state.creatives.forEach((f, i) => {
+    if (f.type.startsWith('image/')) {
+      const el = document.getElementById(`thumb_${i}`);
+      if (el) {
+        const r = new FileReader();
+        r.onload = ev => { el.innerHTML = `<img src="${ev.target.result}" alt="">`; };
+        r.readAsDataURL(f);
+      }
+    }
+  });
+}
+
+// ── Step 3 ──────────────────────────────────────────────────────────────────
+function renderStep3() {
+  const adSetName = state.adSets.find(a => a.id === state.selectedAdSet)?.name || state.selectedAdSet;
+  const resultsHtml = state.results.map(r => `
+    <div class="result-item">
+      <div class="result-icon ${r.status}">${r.status==='success'?'✓':r.status==='error'?'✗':'⏳'}</div>
+      <div style="flex:1">
+        <div class="result-name">${esc(r.name)}</div>
+        ${r.id ? `<div class="result-id">Ad ID: ${r.id}</div>` : ''}
+        ${r.error ? `<div class="result-error">${esc(r.error)}</div>` : ''}
+      </div>
+      <div class="result-status ${r.status}">${r.status}</div>
+    </div>`).join('');
+
+  if (state.launchDone) {
+    const ok = state.results.filter(r => r.status === 'success').length;
+    document.getElementById('appRoot').innerHTML = `
+      <div class="card">
+        <div class="done-screen">
+          <div class="done-emoji">${ok === state.results.length ? '🎉' : '⚠️'}</div>
+          <div class="done-title">${ok} van ${state.results.length} ads aangemaakt</div>
+          <div class="done-sub">Ads staan op PAUSED — zet ze aan in Meta Ads Manager.</div>
+          <div style="margin-bottom:20px">${resultsHtml}</div>
+          <button class="btn btn-secondary" id="btnReset">Nieuwe campagne starten</button>
+        </div>
+      </div>`;
+    bind('btnReset', 'click', resetAll);
+    return;
+  }
+
+  document.getElementById('appRoot').innerHTML = `
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">🚀 Lanceren</span>
+        ${!state.launching ? `<button class="back-btn" id="btnBack3">← Terug</button>` : ''}
+      </div>
+      <div class="summary">
+        ${[['Ad Set', adSetName], ['Creatives', `${state.creatives.length} bestanden`], ['Copy varianten', `${state.copyRows.length} sets`], ['Bestemmings-URL', state.destinationUrl], ['Status na aanmaken', 'PAUSED (jij zet ze aan)']].map(([k,v]) =>
+          `<div class="summary-row"><span class="summary-key">${k}</span><span class="summary-val">${esc(v)}</span></div>`).join('')}
+      </div>
+      ${state.launching ? `<div class="alert alert-info">⏳ Bezig met aanmaken... ${state.results.length}/${state.creatives.length}</div>` : ''}
+      <button class="btn btn-success" id="btnLaunch" ${state.launching ? 'disabled' : ''}>
+        ${state.launching ? '⏳ Bezig...' : `🚀 ${state.creatives.length} ads aanmaken`}
+      </button>
+      ${state.results.length ? `<div style="margin-top:20px">${resultsHtml}</div>` : ''}
+    </div>`;
+
+  bind('btnLaunch', 'click', handleLaunch);
+  bind('btnBack3', 'click', () => go(2));
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function bind(id, event, fn) {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener(event, fn);
+}
+
+function go(step) {
+  state.step = step;
+  state.error = '';
+  render();
+}
+
+function addFiles(files) {
+  const valid = files.filter(f => f.type.startsWith('image/') || f.type.startsWith('video/'));
+  state.creatives = [...state.creatives, ...valid].slice(0, 6);
+  renderStep2();
+}
+
+function resetAll() {
+  Object.assign(state, {
+    step: 0, campaigns: [], adSets: [], selectedCampaign: '', selectedAdSet: '',
+    copyRows: [], creatives: [], results: [], launching: false, launchDone: false, error: ''
+  });
+  render();
+}
+
+function render() {
+  renderSteps();
+  if (state.step === 0) renderStep0();
+  else if (state.step === 1) renderStep1();
+  else if (state.step === 2) renderStep2();
+  else renderStep3();
+}
+
+// ── API ──────────────────────────────────────────────────────────────────────
+async function handleConnect() {
+  state.error = ''; state.loading = true; renderStep0();
+  const accountId = state.adAccountId.startsWith('act_') ? state.adAccountId : `act_${state.adAccountId}`;
+  try {
+    const res = await fetch(`${API}/${accountId}/campaigns?fields=id,name,status&access_token=${state.accessToken}&limit=25`);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.message);
+    state.campaigns = data.data || [];
+    if (!state.campaigns.length) throw new Error('Geen campagnes gevonden. Controleer je Ad Account ID.');
+  } catch(e) { state.error = e.message; }
+  state.loading = false; renderStep0();
+}
+
+async function handleSelectCampaign(id) {
+  state.selectedCampaign = id; state.adSets = []; state.selectedAdSet = '';
+  renderStep0();
+  if (!id) return;
+  try {
+    const res = await fetch(`${API}/${id}/adsets?fields=id,name,status&access_token=${state.accessToken}&limit=25`);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.message);
+    state.adSets = data.data || [];
+  } catch(e) { state.error = e.message; }
+  renderStep0();
+}
+
+async function handleLoadSheet() {
+  state.error = ''; state.loading = true; state.copyRows = []; renderStep1();
+  try {
+    const match = state.sheetUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+    if (!match) throw new Error('Geen geldig Google Sheets URL.');
+    const csvUrl = `https://docs.google.com/spreadsheets/d/${match[1]}/export?format=csv`;
+    const res = await fetch(csvUrl);
+    if (!res.ok) throw new Error('Sheet niet toegankelijk. Ga naar Delen → Iedereen met de link → Bekijker.');
+    const text = await res.text();
+    const rows = text.trim().split('\n').slice(1).map(line => {
+      const cols = line.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/);
+      return {
+        headline: (cols[0]||'').replace(/^"|"$/g,'').trim(),
+        body: (cols[1]||'').replace(/^"|"$/g,'').trim(),
+        description: (cols[2]||'').replace(/^"|"$/g,'').trim(),
+      };
+    }).filter(r => r.headline || r.body);
+    if (!rows.length) throw new Error('Geen copy gevonden. Controleer: kolom A = Headline, B = Bodytekst, C = Beschrijving.');
+    state.copyRows = rows;
+  } catch(e) { state.error = e.message; }
+  state.loading = false; renderStep1();
+}
+
+async function handleLaunch() {
+  state.launching = true; state.results = []; state.launchDone = false; renderStep3();
+  const accountId = state.adAccountId.startsWith('act_') ? state.adAccountId : `act_${state.adAccountId}`;
+
+  for (let i = 0; i < state.creatives.length; i++) {
+    const file = state.creatives[i];
+    const isVideo = file.type.startsWith('video/');
+    const adName = `${file.name.replace(/\.[^/.]+$/, '')} — ad ${i+1}`;
+    state.results.push({ name: adName, status: 'uploading' });
+    renderStep3();
+
+    try {
+      // 1. Upload media
+      const fd = new FormData();
+      fd.append('access_token', state.accessToken);
+      let imageHash = null, videoId = null;
+
+      if (isVideo) {
+        fd.append('source', file);
+        const r = await fetch(`${API}/${accountId}/advideos`, { method: 'POST', body: fd });
+        const d = await r.json();
+        if (d.error) throw new Error(d.error.message);
+        videoId = d.id;
+      } else {
+        fd.append('source', file);
+        const r = await fetch(`${API}/${accountId}/adimages`, { method: 'POST', body: fd });
+        const d = await r.json();
+        if (d.error) throw new Error(d.error.message);
+        const images = d.images;
+        imageHash = images[Object.keys(images)[0]].hash;
+      }
+
+      // 2. Build asset_feed_spec with all copy variants
+      const assetFeedSpec = {
+        bodies: state.copyRows.filter(r=>r.body).map(r=>({ text: r.body })),
+        titles: state.copyRows.filter(r=>r.headline).map(r=>({ text: r.headline })),
+        link_urls: [{ website_url: state.destinationUrl }],
+        call_to_action_types: ['LEARN_MORE'],
+        ad_formats: ['SINGLE_IMAGE'],
+      };
+      if (state.copyRows.some(r=>r.description)) {
+        assetFeedSpec.descriptions = state.copyRows.filter(r=>r.description).map(r=>({ text: r.description }));
+      }
+      if (imageHash) assetFeedSpec.images = [{ hash: imageHash }];
+      if (videoId) {
+        assetFeedSpec.videos = [{ video_id: videoId }];
+        assetFeedSpec.ad_formats = ['SINGLE_VIDEO'];
+      }
+
+      // 3. Create ad creative
+      const creativeBody = {
+        name: `Creative: ${adName}`,
+        asset_feed_spec: assetFeedSpec,
+        access_token: state.accessToken,
+      };
+
+      // Fallback: also set object_story_spec for simpler creatives
+      if (imageHash) {
+        creativeBody.object_story_spec = {
+          page_id: state.pageId,
+          link_data: {
+            image_hash: imageHash,
+            link: state.destinationUrl,
+            message: state.copyRows[0]?.body || '',
+            name: state.copyRows[0]?.headline || '',
+            description: state.copyRows[0]?.description || '',
+            call_to_action: { type: 'LEARN_MORE', value: { link: state.destinationUrl } },
+          }
+        };
+      }
+
+      const creativeRes = await fetch(`${API}/${accountId}/adcreatives`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(creativeBody),
+      });
+      const creativeData = await creativeRes.json();
+      if (creativeData.error) throw new Error(creativeData.error.message);
+
+      // 4. Create ad
+      const adRes = await fetch(`${API}/${accountId}/ads`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: adName,
+          adset_id: state.selectedAdSet,
+          creative: { creative_id: creativeData.id },
+          status: 'PAUSED',
+          access_token: state.accessToken,
+        }),
+      });
+      const adData = await adRes.json();
+      if (adData.error) throw new Error(adData.error.message);
+
+      state.results[i] = { name: adName, status: 'success', id: adData.id };
+    } catch(e) {
+      state.results[i] = { name: adName, status: 'error', error: e.message };
+    }
+    renderStep3();
+  }
+
+  state.launching = false;
+  state.launchDone = true;
+  renderStep3();
+}
+
+// Start
+render();
+</script>
+</body>
+</html>
