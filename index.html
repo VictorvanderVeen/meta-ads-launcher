@@ -123,12 +123,25 @@ const state = {
   error: '', loading: false,
 };
 
-const API = 'https://graph.facebook.com/v19.0';
+// FIX #16: Updated from v19.0 to v21.0
+const API = 'https://graph.facebook.com/v21.0';
 const STEPS = ['Verbinding','Copy','Creatives','Lanceren'];
 const ICONS = ['🔑','📝','🖼️','🚀'];
+const MAX_IMAGE_SIZE = 30 * 1024 * 1024;   // 30 MB
+const MAX_VIDEO_SIZE = 4 * 1024 * 1024 * 1024; // 4 GB
 
 function esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// FIX #13: URL validation helper
+function isValidUrl(s) {
+  try { return !!new URL(s); } catch { return false; }
+}
+
+// FIX #1: Helper to build auth headers (token uit URL params houden)
+function authHeaders(extra) {
+  return Object.assign({ 'Authorization': 'Bearer ' + state.accessToken }, extra || {});
 }
 
 function renderSteps() {
@@ -183,16 +196,19 @@ function renderStep0() {
       ${extra}
     </div>`;
 
-  bind('inToken', 'input', e => { state.accessToken = e.target.value; renderStep0(); });
-  bind('inAccount', 'input', e => { state.adAccountId = e.target.value; renderStep0(); });
-  bind('btnConnect', 'click', handleConnect);
-  bind('selCampaign', 'change', e => handleSelectCampaign(e.target.value));
-  bind('selAdSet', 'change', e => { state.selectedAdSet = e.target.value; renderStep0(); });
-  bind('btnToStep1', 'click', () => go(1));
+  // FIX #15: Property assignment ipv addEventListener (voorkomt listener-stacking)
+  bind('inToken', 'oninput', e => { state.accessToken = e.target.value; renderStep0(); });
+  bind('inAccount', 'oninput', e => { state.adAccountId = e.target.value; renderStep0(); });
+  bind('btnConnect', 'onclick', handleConnect);
+  bind('selCampaign', 'onchange', e => handleSelectCampaign(e.target.value));
+  bind('selAdSet', 'onchange', e => { state.selectedAdSet = e.target.value; renderStep0(); });
+  bind('btnToStep1', 'onclick', () => go(1));
 }
 
 // ── Step 1 ──────────────────────────────────────────────────────────────────
 function renderStep1() {
+  // FIX #13: URL validatie voor "Verder" knop
+  const canProceed = isValidUrl(state.destinationUrl) && state.pageId;
   const table = state.copyRows.length ? `
     <div class="badge">✓ ${state.copyRows.length} copy-varianten geladen</div>
     <table class="copy-table">
@@ -208,9 +224,10 @@ function renderStep1() {
     </table>
     <div style="margin-top:20px">
       ${mkField('Bestemmings-URL','inUrl','url',state.destinationUrl,'https://follow-this.org/green-paper','')}
+      ${state.destinationUrl && !isValidUrl(state.destinationUrl) ? '<p class="hint" style="color:var(--red);margin-top:-12px;margin-bottom:12px">Voer een geldige URL in (inclusief https://)</p>' : ''}
       ${mkField('Facebook Page ID','inPageId','text',state.pageId,'123456789','Vind je via je Facebook pagina → Over → Pagina ID')}
     </div>
-    ${state.destinationUrl && state.pageId ? `<button class="btn btn-primary" id="btnToStep2">Verder naar Creatives →</button>` : ''}
+    ${canProceed ? `<button class="btn btn-primary" id="btnToStep2">Verder naar Creatives →</button>` : ''}
   ` : '';
 
   document.getElementById('appRoot').innerHTML = `
@@ -227,12 +244,13 @@ function renderStep1() {
       ${table}
     </div>`;
 
-  bind('inSheet', 'input', e => { state.sheetUrl = e.target.value; });
-  bind('btnLoadSheet', 'click', handleLoadSheet);
-  bind('inUrl', 'input', e => { state.destinationUrl = e.target.value; renderStep1(); });
-  bind('inPageId', 'input', e => { state.pageId = e.target.value; renderStep1(); });
-  bind('btnToStep2', 'click', () => go(2));
-  bind('btnBack1', 'click', () => go(0));
+  // FIX #15: Property assignment
+  bind('inSheet', 'oninput', e => { state.sheetUrl = e.target.value; });
+  bind('btnLoadSheet', 'onclick', handleLoadSheet);
+  bind('inUrl', 'oninput', e => { state.destinationUrl = e.target.value; renderStep1(); });
+  bind('inPageId', 'oninput', e => { state.pageId = e.target.value; renderStep1(); });
+  bind('btnToStep2', 'onclick', () => go(2));
+  bind('btnBack1', 'onclick', () => go(0));
 }
 
 // ── Step 2 ──────────────────────────────────────────────────────────────────
@@ -253,6 +271,7 @@ function renderStep2() {
         <span class="card-title">🖼️ Creatives (${state.creatives.length}/6)</span>
         <button class="back-btn" id="btnBack2">← Terug</button>
       </div>
+      ${mkAlert('error', state.error)}
       ${state.creatives.length < 6 ? `
       <div class="dropzone" id="dropzone">
         <div class="dropzone-icon">📁</div>
@@ -271,27 +290,30 @@ function renderStep2() {
       ` : ''}
     </div>`;
 
-  bind('btnBack2', 'click', () => go(1));
-  bind('btnToStep3', 'click', () => go(3));
+  // FIX #15: Property assignment
+  bind('btnBack2', 'onclick', () => go(1));
+  bind('btnToStep3', 'onclick', () => go(3));
 
   const dz = document.getElementById('dropzone');
   const fi = document.getElementById('fileInput');
   if (dz) {
-    dz.addEventListener('click', () => fi.click());
-    dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragover'); });
-    dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
-    dz.addEventListener('drop', e => {
+    dz.onclick = () => fi.click();
+    dz.ondragover = e => { e.preventDefault(); dz.classList.add('dragover'); };
+    dz.ondragleave = () => dz.classList.remove('dragover');
+    dz.ondrop = e => {
       e.preventDefault(); dz.classList.remove('dragover');
       addFiles(Array.from(e.dataTransfer.files));
-    });
+    };
   }
-  if (fi) fi.addEventListener('change', e => addFiles(Array.from(e.target.files)));
+  if (fi) fi.onchange = e => addFiles(Array.from(e.target.files));
 
+  // FIX #15: Property assignment voor remove-knoppen
   document.querySelectorAll('.creative-remove').forEach(btn => {
-    btn.addEventListener('click', e => {
+    btn.onclick = e => {
       state.creatives.splice(parseInt(e.currentTarget.dataset.idx), 1);
+      state.error = '';
       renderStep2();
-    });
+    };
   });
 
   // Load image previews
@@ -333,7 +355,7 @@ function renderStep3() {
           <button class="btn btn-secondary" id="btnReset">Nieuwe campagne starten</button>
         </div>
       </div>`;
-    bind('btnReset', 'click', resetAll);
+    bind('btnReset', 'onclick', resetAll);
     return;
   }
 
@@ -354,14 +376,16 @@ function renderStep3() {
       ${state.results.length ? `<div style="margin-top:20px">${resultsHtml}</div>` : ''}
     </div>`;
 
-  bind('btnLaunch', 'click', handleLaunch);
-  bind('btnBack3', 'click', () => go(2));
+  bind('btnLaunch', 'onclick', handleLaunch);
+  bind('btnBack3', 'onclick', () => go(2));
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-function bind(id, event, fn) {
+// FIX #15: Gebruik property assignment (el.onclick = fn) ipv addEventListener
+// zodat herhaalde renders geen listeners stapelen
+function bind(id, prop, fn) {
   const el = document.getElementById(id);
-  if (el) el.addEventListener(event, fn);
+  if (el) el[prop] = fn;
 }
 
 function go(step) {
@@ -370,16 +394,33 @@ function go(step) {
   render();
 }
 
+// FIX #12: Bestandsgrootte-validatie
 function addFiles(files) {
-  const valid = files.filter(f => f.type.startsWith('image/') || f.type.startsWith('video/'));
+  state.error = '';
+  const valid = [];
+  for (const f of files) {
+    if (!f.type.startsWith('image/') && !f.type.startsWith('video/')) continue;
+    if (f.type.startsWith('image/') && f.size > MAX_IMAGE_SIZE) {
+      state.error = `${f.name} is te groot (${(f.size/1024/1024).toFixed(1)} MB). Max 30 MB voor afbeeldingen.`;
+      continue;
+    }
+    if (f.type.startsWith('video/') && f.size > MAX_VIDEO_SIZE) {
+      state.error = `${f.name} is te groot (${(f.size/1024/1024/1024).toFixed(1)} GB). Max 4 GB voor video's.`;
+      continue;
+    }
+    valid.push(f);
+  }
   state.creatives = [...state.creatives, ...valid].slice(0, 6);
   renderStep2();
 }
 
+// FIX #4: Token en account ID ook wissen bij reset
 function resetAll() {
   Object.assign(state, {
-    step: 0, campaigns: [], adSets: [], selectedCampaign: '', selectedAdSet: '',
-    copyRows: [], creatives: [], results: [], launching: false, launchDone: false, error: ''
+    step: 0, accessToken: '', adAccountId: '',
+    campaigns: [], adSets: [], selectedCampaign: '', selectedAdSet: '',
+    sheetUrl: '', copyRows: [], destinationUrl: '', pageId: '',
+    creatives: [], results: [], launching: false, launchDone: false, error: ''
   });
   render();
 }
@@ -392,12 +433,56 @@ function render() {
   else renderStep3();
 }
 
+// FIX #6: Robuuste CSV parser die newlines in quotes en escaped quotes aankan
+function parseCSV(text) {
+  const rows = [];
+  let row = [];
+  let field = '';
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (text[i + 1] === '"') { field += '"'; i++; }
+        else inQuotes = false;
+      } else {
+        field += ch;
+      }
+    } else if (ch === '"') {
+      inQuotes = true;
+    } else if (ch === ',') {
+      row.push(field);
+      field = '';
+    } else if (ch === '\r') {
+      // skip, \n volgt
+    } else if (ch === '\n') {
+      row.push(field);
+      rows.push(row);
+      row = [];
+      field = '';
+    } else {
+      field += ch;
+    }
+  }
+  if (field.length > 0 || row.length > 0) {
+    row.push(field);
+    rows.push(row);
+  }
+  return rows;
+}
+
 // ── API ──────────────────────────────────────────────────────────────────────
+
+// FIX #1: Token in Authorization header ipv URL parameters
+// FIX #9: Double-click guard met early return
 async function handleConnect() {
+  if (state.loading) return;
   state.error = ''; state.loading = true; renderStep0();
   const accountId = state.adAccountId.startsWith('act_') ? state.adAccountId : `act_${state.adAccountId}`;
   try {
-    const res = await fetch(`${API}/${accountId}/campaigns?fields=id,name,status&access_token=${state.accessToken}&limit=25`);
+    const res = await fetch(`${API}/${accountId}/campaigns?fields=id,name,status&limit=25`, {
+      headers: authHeaders()
+    });
     const data = await res.json();
     if (data.error) throw new Error(data.error.message);
     state.campaigns = data.data || [];
@@ -411,7 +496,9 @@ async function handleSelectCampaign(id) {
   renderStep0();
   if (!id) return;
   try {
-    const res = await fetch(`${API}/${id}/adsets?fields=id,name,status&access_token=${state.accessToken}&limit=25`);
+    const res = await fetch(`${API}/${id}/adsets?fields=id,name,status&limit=25`, {
+      headers: authHeaders()
+    });
     const data = await res.json();
     if (data.error) throw new Error(data.error.message);
     state.adSets = data.data || [];
@@ -419,7 +506,9 @@ async function handleSelectCampaign(id) {
   renderStep0();
 }
 
+// FIX #6: Gebruik parseCSV() ipv split('\n') + regex
 async function handleLoadSheet() {
+  if (state.loading) return;
   state.error = ''; state.loading = true; state.copyRows = []; renderStep1();
   try {
     const match = state.sheetUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
@@ -428,21 +517,26 @@ async function handleLoadSheet() {
     const res = await fetch(csvUrl);
     if (!res.ok) throw new Error('Sheet niet toegankelijk. Ga naar Delen → Iedereen met de link → Bekijker.');
     const text = await res.text();
-    const rows = text.trim().split('\n').slice(1).map(line => {
-      const cols = line.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/);
-      return {
-        headline: (cols[0]||'').replace(/^"|"$/g,'').trim(),
-        body: (cols[1]||'').replace(/^"|"$/g,'').trim(),
-        description: (cols[2]||'').replace(/^"|"$/g,'').trim(),
-      };
-    }).filter(r => r.headline || r.body);
+    const allRows = parseCSV(text);
+    const dataRows = allRows.slice(1); // skip header
+    const rows = dataRows.map(cols => ({
+      headline: (cols[0] || '').trim(),
+      body: (cols[1] || '').trim(),
+      description: (cols[2] || '').trim(),
+    })).filter(r => r.headline || r.body);
     if (!rows.length) throw new Error('Geen copy gevonden. Controleer: kolom A = Headline, B = Bodytekst, C = Beschrijving.');
     state.copyRows = rows;
   } catch(e) { state.error = e.message; }
   state.loading = false; renderStep1();
 }
 
+// FIX #9: Double-click guard
+// FIX #1: Token in Authorization header ipv in JSON body
+// FIX #8: Null-check op adimages response
+// FIX #10: Gebruik alleen object_story_spec (geen conflicterende asset_feed_spec)
+// FIX #11: Video creatives krijgen nu ook page_id via object_story_spec
 async function handleLaunch() {
+  if (state.launching) return;
   state.launching = true; state.results = []; state.launchDone = false; renderStep3();
   const accountId = state.adAccountId.startsWith('act_') ? state.adAccountId : `act_${state.adAccountId}`;
 
@@ -454,53 +548,49 @@ async function handleLaunch() {
     renderStep3();
 
     try {
-      // 1. Upload media
+      // 1. Upload media — FormData met token in header
       const fd = new FormData();
-      fd.append('access_token', state.accessToken);
+      fd.append('source', file);
       let imageHash = null, videoId = null;
 
       if (isVideo) {
-        fd.append('source', file);
-        const r = await fetch(`${API}/${accountId}/advideos`, { method: 'POST', body: fd });
+        const r = await fetch(`${API}/${accountId}/advideos`, {
+          method: 'POST', headers: authHeaders(), body: fd
+        });
         const d = await r.json();
         if (d.error) throw new Error(d.error.message);
         videoId = d.id;
       } else {
-        fd.append('source', file);
-        const r = await fetch(`${API}/${accountId}/adimages`, { method: 'POST', body: fd });
+        const r = await fetch(`${API}/${accountId}/adimages`, {
+          method: 'POST', headers: authHeaders(), body: fd
+        });
         const d = await r.json();
         if (d.error) throw new Error(d.error.message);
+        // FIX #8: Null-check
         const images = d.images;
+        if (!images || !Object.keys(images).length) {
+          throw new Error('Geen image hash ontvangen van Meta. Controleer het bestandsformaat.');
+        }
         imageHash = images[Object.keys(images)[0]].hash;
       }
 
-      // 2. Build asset_feed_spec with all copy variants
-      const assetFeedSpec = {
-        bodies: state.copyRows.filter(r=>r.body).map(r=>({ text: r.body })),
-        titles: state.copyRows.filter(r=>r.headline).map(r=>({ text: r.headline })),
-        link_urls: [{ website_url: state.destinationUrl }],
-        call_to_action_types: ['LEARN_MORE'],
-        ad_formats: ['SINGLE_IMAGE'],
-      };
-      if (state.copyRows.some(r=>r.description)) {
-        assetFeedSpec.descriptions = state.copyRows.filter(r=>r.description).map(r=>({ text: r.description }));
-      }
-      if (imageHash) assetFeedSpec.images = [{ hash: imageHash }];
-      if (videoId) {
-        assetFeedSpec.videos = [{ video_id: videoId }];
-        assetFeedSpec.ad_formats = ['SINGLE_VIDEO'];
-      }
-
-      // 3. Create ad creative
-      const creativeBody = {
-        name: `Creative: ${adName}`,
-        asset_feed_spec: assetFeedSpec,
-        access_token: state.accessToken,
-      };
-
-      // Fallback: also set object_story_spec for simpler creatives
-      if (imageHash) {
-        creativeBody.object_story_spec = {
+      // 2. Create ad creative met object_story_spec
+      // FIX #10: Gebruik alleen object_story_spec, geen conflicterende asset_feed_spec
+      // FIX #11: Zowel image als video krijgen object_story_spec met page_id
+      let storySpec;
+      if (isVideo) {
+        storySpec = {
+          page_id: state.pageId,
+          video_data: {
+            video_id: videoId,
+            message: state.copyRows[0]?.body || '',
+            title: state.copyRows[0]?.headline || '',
+            link_description: state.copyRows[0]?.description || '',
+            call_to_action: { type: 'LEARN_MORE', value: { link: state.destinationUrl } },
+          }
+        };
+      } else {
+        storySpec = {
           page_id: state.pageId,
           link_data: {
             image_hash: imageHash,
@@ -515,22 +605,24 @@ async function handleLaunch() {
 
       const creativeRes = await fetch(`${API}/${accountId}/adcreatives`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(creativeBody),
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          name: `Creative: ${adName}`,
+          object_story_spec: storySpec,
+        }),
       });
       const creativeData = await creativeRes.json();
       if (creativeData.error) throw new Error(creativeData.error.message);
 
-      // 4. Create ad
+      // 3. Create ad
       const adRes = await fetch(`${API}/${accountId}/ads`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           name: adName,
           adset_id: state.selectedAdSet,
           creative: { creative_id: creativeData.id },
           status: 'PAUSED',
-          access_token: state.accessToken,
         }),
       });
       const adData = await adRes.json();
