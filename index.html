@@ -245,7 +245,7 @@ function renderStep1() {
     </div>`;
 
   // FIX #15: Property assignment
-  bind('inSheet', 'oninput', e => { state.sheetUrl = e.target.value; });
+  bind('inSheet', 'oninput', e => { state.sheetUrl = e.target.value; renderStep1(); });
   bind('btnLoadSheet', 'onclick', handleLoadSheet);
   bind('inUrl', 'oninput', e => { state.destinationUrl = e.target.value; renderStep1(); });
   bind('inPageId', 'oninput', e => { state.pageId = e.target.value; renderStep1(); });
