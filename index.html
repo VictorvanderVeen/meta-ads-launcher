@@ -117,7 +117,7 @@ const state = {
   campaigns: [], adSets: [],
   selectedCampaign: '', selectedAdSet: '',
   sheetUrl: '', copyRows: [],
-  destinationUrl: '', pageId: '',
+  destinationUrl: '', pageId: '', pages: [],
   creatives: [],
   results: [], launching: false, launchDone: false,
   error: '', loading: false,
@@ -225,7 +225,15 @@ function renderStep1() {
     <div style="margin-top:20px">
       ${mkField('Bestemmings-URL','inUrl','url',state.destinationUrl,'https://follow-this.org/green-paper','')}
       ${state.destinationUrl && !isValidUrl(state.destinationUrl) ? '<p class="hint" style="color:var(--red);margin-top:-12px;margin-bottom:12px">Voer een geldige URL in (inclusief https://)</p>' : ''}
-      ${mkField('Facebook Page ID','inPageId','text',state.pageId,'123456789','Vind je via je Facebook pagina → Over → Pagina ID')}
+      <div class="field">
+        <label>Facebook pagina</label>
+        ${state.pages.length ? `
+          <select id="selPage">
+            <option value="">— Selecteer pagina —</option>
+            ${state.pages.map(p=>`<option value="${p.id}" ${state.pageId===p.id?'selected':''}>${esc(p.name)} (${p.id})</option>`).join('')}
+          </select>
+        ` : `<input type="text" id="inPageId" value="${esc(state.pageId)}" placeholder="123456789"><p class="hint">Geen pagina's gevonden. Voer handmatig een Page ID in.</p>`}
+      </div>
     </div>
     ${canProceed ? `<button class="btn btn-primary" id="btnToStep2">Verder naar Creatives →</button>` : ''}
   ` : '';
@@ -248,6 +256,7 @@ function renderStep1() {
   bind('inSheet', 'oninput', e => { state.sheetUrl = e.target.value; renderStep1(); });
   bind('btnLoadSheet', 'onclick', handleLoadSheet);
   bind('inUrl', 'oninput', e => { state.destinationUrl = e.target.value; renderStep1(); });
+  bind('selPage', 'onchange', e => { state.pageId = e.target.value; renderStep1(); });
   bind('inPageId', 'oninput', e => { state.pageId = e.target.value; renderStep1(); });
   bind('btnToStep2', 'onclick', () => go(2));
   bind('btnBack1', 'onclick', () => go(0));
@@ -419,7 +428,7 @@ function resetAll() {
   Object.assign(state, {
     step: 0, accessToken: '', adAccountId: '',
     campaigns: [], adSets: [], selectedCampaign: '', selectedAdSet: '',
-    sheetUrl: '', copyRows: [], destinationUrl: '', pageId: '',
+    sheetUrl: '', copyRows: [], destinationUrl: '', pageId: '', pages: [],
     creatives: [], results: [], launching: false, launchDone: false, error: ''
   });
   render();
@@ -487,6 +496,12 @@ async function handleConnect() {
     if (data.error) throw new Error(data.error.message);
     state.campaigns = data.data || [];
     if (!state.campaigns.length) throw new Error('Geen campagnes gevonden. Controleer je Ad Account ID.');
+    // Fetch pages the user has access to
+    const pagesRes = await fetch(`${API}/me/accounts?fields=id,name&limit=50`, {
+      headers: authHeaders()
+    });
+    const pagesData = await pagesRes.json();
+    state.pages = (pagesData.data || []);
   } catch(e) { state.error = e.message; }
   state.loading = false; renderStep0();
 }
